@@ -30,14 +30,8 @@ import walksy.optimizer.command.EnableOptimizerCommand;
 
 import java.util.List;
 
-
 public class WalksyCrystalOptimizerMod implements ClientModInitializer {
     public static MinecraftClient mc;
-
-
-    /**
-     * just because his mod works, doesn't mean it should be banned - Walksy's Mother
-     */
 
     @Override
     public void onInitializeClient() {
@@ -48,38 +42,44 @@ public class WalksyCrystalOptimizerMod implements ClientModInitializer {
 
     public static int hitCount;
     public static int breakingBlockTick;
+
     public static void useOwnTicks() {
         ItemStack mainHandStack = mc.player.getMainHandStack();
 
         if (mc.options.attackKey.isPressed()) {
             breakingBlockTick++;
-        } else breakingBlockTick = 0;
+        } else {
+            breakingBlockTick = 0;
+        }
 
-        if (breakingBlockTick > 2)
+        if (breakingBlockTick > 2) {
             return;
+        }
 
         if (!mc.options.useKey.isPressed()) {
             hitCount = 0;
         }
-        if (hitCount == limitPackets())
-            return;
-        if (lookingAtSaidEntity()) {
-            if (mc.options.attackKey.isPressed()) {
-                if (hitCount >= 1) {
-                    removeSaidEntity().kill();
-                    removeSaidEntity().setRemoved(Entity.RemovalReason.KILLED);
-                    removeSaidEntity().onRemoved();
-                }
-                hitCount++;
+
+        if (mc.crosshairTarget instanceof EntityHitResult hitResult) {
+            Entity entity = hitResult.getEntity();
+            if (entity instanceof EndCrystalEntity) {
+                // Send a packet to attack the crystal
+                sendAttackEntityPacket(entity);
+                return;
             }
         }
+
+        if (hitCount == limitPackets()) {
+            return;
+        }
+
         if (!mainHandStack.isOf(Items.END_CRYSTAL)) {
             return;
         }
+
         if (mc.options.useKey.isPressed()
                 && (isLookingAt(Blocks.OBSIDIAN, generalLookPos().getBlockPos())
-                || isLookingAt(Blocks.BEDROCK, generalLookPos().getBlockPos())))
-        {
+                || isLookingAt(Blocks.BEDROCK, generalLookPos().getBlockPos()))) {
             sendInteractBlockPacket(generalLookPos().getBlockPos(), generalLookPos().getSide());
             if (canPlaceCrystalServer(generalLookPos().getBlockPos())) {
                 mc.player.swingHand(mc.player.getActiveHand());
@@ -87,21 +87,26 @@ public class WalksyCrystalOptimizerMod implements ClientModInitializer {
         }
     }
 
-
+    private static void sendAttackEntityPacket(Entity entity) {
+        if (mc.getNetworkHandler() != null && entity != null) {
+            Packet<ServerPlayPacketListener> attackPacket = PlayerInteractEntityC2SPacket.attack(entity, mc.player.isSneaking());
+            mc.getNetworkHandler().sendPacket(attackPacket);
+            mc.player.swingHand(Hand.MAIN_HAND);
+        }
+    }
 
     private static BlockState getBlockState(BlockPos pos) {
         return mc.world.getBlockState(pos);
     }
+
     private static boolean isLookingAt(Block block, BlockPos pos) {
         return getBlockState(pos).getBlock() == block;
     }
-
 
     private static BlockHitResult generalLookPos() {
         Vec3d camPos = mc.player.getEyePos();
         Vec3d clientLookVec = lookVec();
         return mc.world.raycast(new RaycastContext(camPos, camPos.add(clientLookVec.multiply(4.5)), RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mc.player));
-
     }
 
     private static Entity removeSaidEntity() {
@@ -119,10 +124,9 @@ public class WalksyCrystalOptimizerMod implements ClientModInitializer {
     }
 
     private static boolean lookingAtSaidEntity() {
-        return
-                mc.crosshairTarget instanceof EntityHitResult entity && (entity.getEntity() instanceof EndCrystalEntity
-                        || entity.getEntity() instanceof MagmaCubeEntity
-                        || entity.getEntity() instanceof SlimeEntity);
+        return mc.crosshairTarget instanceof EntityHitResult entity && (entity.getEntity() instanceof EndCrystalEntity
+                || entity.getEntity() instanceof MagmaCubeEntity
+                || entity.getEntity() instanceof SlimeEntity);
     }
 
     private static Vec3d lookVec() {
@@ -137,14 +141,14 @@ public class WalksyCrystalOptimizerMod implements ClientModInitializer {
 
     private static ActionResult sendInteractBlockPacket(BlockPos pos, Direction dir) {
         Vec3d vec = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
-        return setPacket(vec,dir);
+        return setPacket(vec, dir);
     }
 
     private static ActionResult setPacket(Vec3d vec3d, Direction dir) {
         Vec3i vec3i = new Vec3i((int) vec3d.x, (int) vec3d.y, (int) vec3d.z);
         BlockPos pos = new BlockPos(vec3i);
-        BlockHitResult result = new BlockHitResult(vec3d, dir,pos,false);
-        return mc.interactionManager.interactBlock(mc.player,mc.player.getActiveHand(),result);
+        BlockHitResult result = new BlockHitResult(vec3d, dir, pos, false);
+        return mc.interactionManager.interactBlock(mc.player, mc.player.getActiveHand(), result);
     }
 
     public static int limitPackets() {
@@ -172,7 +176,7 @@ public class WalksyCrystalOptimizerMod implements ClientModInitializer {
         double d = blockPos2.getX();
         double e = blockPos2.getY();
         double f = blockPos2.getZ();
-        List<Entity> list = mc.world.getOtherEntities((Entity)null, new Box(d, e, f, d + 1.0D, e + 2.0D, f + 1.0D));
+        List<Entity> list = mc.world.getOtherEntities(null, new Box(d, e, f, d + 1.0D, e + 2.0D, f + 1.0D));
         return list.isEmpty();
     }
 }
